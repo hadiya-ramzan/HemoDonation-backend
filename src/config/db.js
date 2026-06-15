@@ -26,6 +26,20 @@ const pool = mysql.createPool({
   decimalNumbers: true,
 });
 
+
+pool.getConnection()
+  .then((conn) => {
+    console.log("✅ Connected to MySQL");
+    conn.release();
+  })
+  .catch((err) => {
+    console.log("❌ DB Connection Failed");
+    console.log("Host:", process.env.MYSQLHOST);
+    console.log("Database:", process.env.MYSQLDATABASE);
+    console.error(err.message);
+  });
+  
+
 module.exports = pool;
 
 

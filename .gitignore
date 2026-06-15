@@ -3,5 +3,3 @@ node_modules/
 uploads/
 dist/
 build/
-npm-debug.log
-.DS_Store
