@@ -131,6 +131,36 @@ const buildDonorNotificationCandidates = ({ donors, request, recipient }) => {
     .slice(0, 25);
 };
 
+/*================= BLOOD COMPATIBILITY  =================*/
+const BLOOD_COMPATIBILITY = {
+  "A+": ["A+", "A-", "O+", "O-"],
+  "A-": ["A-", "O-"],
+
+  "B+": ["B+", "B-", "O+", "O-"],
+  "B-": ["B-", "O-"],
+
+  "AB+": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+  "AB-": ["A-", "B-", "AB-", "O-"],
+
+  "O+": ["O+", "O-"],
+  "O-": ["O-"],
+};
+
+/*================= DONOR CAN DONATE TO  =================*/
+const DONOR_CAN_DONATE_TO = {
+  "A+": ["A+", "AB+"],
+  "A-": ["A+", "A-", "AB+", "AB-"],
+
+  "B+": ["B+", "AB+"],
+  "B-": ["B+", "B-", "AB+", "AB-"],
+
+  "AB+": ["AB+"],
+  "AB-": ["AB+", "AB-"],
+
+  "O+": ["O+", "A+", "B+", "AB+"],
+  "O-": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+};
+
 /* ================= CREATE BLOOD REQUEST ================= */
 const createBloodRequest = async ({
   recipient_id,
@@ -169,17 +199,25 @@ const createBloodRequest = async ({
 
   const recipient = recipientRows[0] || {};
 
+  const compatibleGroups =
+    BLOOD_COMPATIBILITY[blood_group] || [blood_group];
+
+  const placeholders =
+    compatibleGroups.map(() => "?").join(",");
+
   const [donors] = await pool.query(
-    `SELECT *
-     FROM users
-     WHERE role IN ('donor', 'both')
-       AND account_status = 'active'
-       AND is_verified_donor = 1
-       AND donor_availability = 'available'
-       AND is_eligible_donor = 1
-       AND blood_group = ?
-       AND id <> ?`,
-    [blood_group, recipient_id]
+    `
+SELECT *
+FROM users
+WHERE role IN ('donor', 'both')
+AND account_status = 'active'
+AND is_verified_donor = 1
+AND donor_availability = 'available'
+AND is_eligible_donor = 1
+AND blood_group IN (${placeholders})
+AND id <> ?
+`,
+    [...compatibleGroups, recipient_id]
   );
 
   const request = {
@@ -264,36 +302,103 @@ const getRequestsByRecipient = async (recipient_id) => {
 };
 
 /* ================= MATCHING REQUESTS FOR DONOR ================= */
+// const getMatchingRequests = async (blood_group, city, donorId) => {
+//   const compatibleRecipients =
+//     DONOR_CAN_DONATE_TO[blood_group] || [blood_group];
+
+//   const placeholders =
+//     compatibleRecipients.map(() => "?").join(",");
+
+//   blood_group = String(blood_group).trim().toUpperCase();
+//   city = String(city).trim();
+
+//   const [rows] = await pool.query(
+//     `
+// SELECT
+// br.*,
+// CASE
+//   WHEN br.status = 'open' THEN 'pending'
+//   WHEN br.status IN ('completed', 'cancelled', 'rejected') THEN 'closed'
+//   ELSE br.status
+// END AS display_status,
+// r.full_name AS recipient_name,
+// r.phone AS recipient_phone
+// FROM blood_requests br
+// JOIN users r ON br.recipient_id = r.id
+// LEFT JOIN request_responses rr
+// ON rr.request_id = br.id
+// AND rr.donor_id = ?
+// WHERE br.blood_group IN (${placeholders})
+// AND br.status='open'
+// AND br.recipient_id <> ?
+// AND rr.id IS NULL
+// ORDER BY
+// CASE br.urgency
+// WHEN 'critical' THEN 1
+// WHEN 'urgent' THEN 2
+// ELSE 3
+// END,
+// br.created_at DESC
+// `,
+//     [
+//       donorId,
+//       ...compatibleRecipients,
+//       donorId
+//     ]
+//   );
+// console.log("DONOR BLOOD GROUP:", blood_group);
+// console.log("COMPATIBLE RECIPIENTS:", compatibleRecipients);
+// console.log("ROWS FOUND:", rows.length);
+// console.log(rows);
+//   return rows;
+// };
+
 const getMatchingRequests = async (blood_group, city, donorId) => {
+
+  console.log("DONOR BLOOD GROUP:", blood_group);
+
+  const compatibleRecipients =
+    DONOR_CAN_DONATE_TO[blood_group] || [];
+
+  console.log("CAN SEE REQUEST GROUPS:", compatibleRecipients);
+
+
+  const placeholders = compatibleRecipients
+    .map(() => "?")
+    .join(",");
+
+
   const [rows] = await pool.query(
-    `SELECT 
-       br.*,
-       CASE
-         WHEN br.status = 'open' THEN 'pending'
-         WHEN br.status IN ('completed', 'cancelled', 'rejected') THEN 'closed'
-         ELSE br.status
-       END AS display_status,
-       r.full_name AS recipient_name,
-       r.phone AS recipient_phone
-     FROM blood_requests br
-     JOIN users r ON br.recipient_id = r.id
-     LEFT JOIN request_responses rr
-       ON rr.request_id = br.id
-      AND rr.donor_id = ?
-     WHERE br.blood_group = ?
-       AND LOWER(br.city) = LOWER(?)
-       AND br.status = 'open'
-       AND br.recipient_id <> ?
-       AND rr.id IS NULL
-     ORDER BY 
-       CASE br.urgency
-         WHEN 'critical' THEN 1
-         WHEN 'urgent' THEN 2
-         ELSE 3
-       END,
-       br.created_at DESC`,
-    [donorId, blood_group, city, donorId]
+    `
+SELECT
+br.*,
+r.full_name AS recipient_name,
+r.phone AS recipient_phone
+FROM blood_requests br
+JOIN users r
+ON br.recipient_id = r.id
+
+LEFT JOIN request_responses rr
+ON rr.request_id = br.id
+AND rr.donor_id = ?
+
+WHERE br.blood_group IN (${placeholders})
+AND br.status='open'
+AND br.recipient_id <> ?
+AND LOWER(TRIM(br.city)) = LOWER(TRIM(?))
+AND rr.id IS NULL
+
+ORDER BY br.created_at DESC
+`,
+    [
+      donorId,
+      ...compatibleRecipients,
+      donorId,
+      city
+    ]
   );
+
+  console.log("MATCHING REQUESTS FROM DB:", rows);
 
   return rows;
 };
@@ -356,9 +461,28 @@ const respondToRequest = async ({ requestId, donorId, status }) => {
       return { affectedRows: 0, reason: "You cannot respond to your own request" };
     }
 
-    if (request.blood_group !== donor.blood_group || String(request.city).toLowerCase() !== String(donor.city).toLowerCase()) {
+    // if (request.blood_group !== donor.blood_group || String(request.city).toLowerCase() !== String(donor.city).toLowerCase()) {
+    //   await connection.rollback();
+    //   return { affectedRows: 0, reason: "This request does not match your blood group or city" };
+    // }
+
+    const donorGroup =
+      String(donor.blood_group).trim().toUpperCase();
+
+    const requestGroup =
+      String(request.blood_group).trim().toUpperCase();
+
+    const canDonateTo =
+      DONOR_CAN_DONATE_TO[donorGroup] || [];
+
+    if (!canDonateTo.includes(requestGroup)) {
       await connection.rollback();
-      return { affectedRows: 0, reason: "This request does not match your blood group or city" };
+
+      return {
+        affectedRows: 0,
+        reason:
+          "Your blood group is not compatible with this recipient",
+      };
     }
 
     await connection.query(

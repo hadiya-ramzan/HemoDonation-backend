@@ -97,32 +97,98 @@ const getMyRequests = async (req, res) => {
   }
 };
 
+// const getMatchingRequestsController = async (req, res) => {
+//   try {
+//     const userId = Number(getUserId(req));
+
+//     if (!userId || isNaN(userId)) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Invalid user session"
+//       });
+//     }
+
+//     if (!userId) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Invalid token. User id missing.",
+//       });
+//     }
+
+//     const donor = await donorRepository.getDonorProfileById(userId);
+
+//     if (!donor) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Donor profile not found",
+//       });
+//     }
+
+//     const requests = await requestRepository.getMatchingRequests(
+//       donor.blood_group,
+//       donor.city,
+//       userId
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       requests,
+//     });
+//   } catch (error) {
+//     console.error("Get matching requests error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch matching requests",
+//     });
+//   }
+// };
+
+
+
+// const getMatchingRequestsController = async (req, res) => {
+//   try {
+//     const userId = Number(getUserId(req));
+
+//     console.log("USER ID:", userId);
+
+//     const donor = await donorRepository.getDonorProfileById(userId);
+
+//     console.log("DONOR PROFILE:", donor);
+
+//     const requests = await requestRepository.getMatchingRequests(
+//       donor.blood_group,
+//       donor.city,
+//       userId
+//     );
+
+//     console.log("MATCHING REQUESTS:", requests);
+
+//     return res.status(200).json({
+//       success: true,
+//       requests,
+//     });
+//   } catch (error) {
+//     console.error("Get matching requests error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch matching requests",
+//     });
+//   }
+// };
+
 const getMatchingRequestsController = async (req, res) => {
   try {
+
     const userId = Number(getUserId(req));
 
-    if (!userId || isNaN(userId)) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid user session"
-      });
-    }
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid token. User id missing.",
-      });
-    }
+    console.log("MATCHING CONTROLLER HIT");
+    console.log("USER ID:", userId);
 
     const donor = await donorRepository.getDonorProfileById(userId);
 
-    if (!donor) {
-      return res.status(404).json({
-        success: false,
-        message: "Donor profile not found",
-      });
-    }
+    console.log("DONOR PROFILE:", donor);
 
     const requests = await requestRepository.getMatchingRequests(
       donor.blood_group,
@@ -130,16 +196,17 @@ const getMatchingRequestsController = async (req, res) => {
       userId
     );
 
+    console.log("FINAL REQUESTS:", requests);
+
     return res.status(200).json({
       success: true,
       requests,
     });
-  } catch (error) {
-    console.error("Get matching requests error:", error);
 
+  } catch (error) {
+    console.error(error);
     return res.status(500).json({
-      success: false,
-      message: "Failed to fetch matching requests",
+      success: false
     });
   }
 };
