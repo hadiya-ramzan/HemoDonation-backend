@@ -232,7 +232,7 @@ const parseCoordinate = (value) => {
 
 const getDonorProfile = async (req, res) => {
   try {
-      const userId = req.user.id || req.user.userId;
+    const userId = req.user.id || req.user.userId;
     const donor = await donorRepository.getDonorProfileById(userId);
     if (!donor) {
       return res.status(404).json({
@@ -311,6 +311,16 @@ const updateProfile = async (req, res) => {
       });
     }
 
+    if (
+      (whatsapp && !isValidPakistaniPhone(whatsapp)) ||
+      (emergency_contact && !isValidPakistaniPhone(emergency_contact))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter valid Pakistani number (03XXXXXXXXX)",
+      });
+    }
+
     const existingDonor = await donorRepository.getDonorProfileById(userId);
     if (!existingDonor) {
       return res.status(404).json({
@@ -353,8 +363,8 @@ const updateProfile = async (req, res) => {
       city: sanitizeText(city, 100),
       profile_photo: profilePhotoPath,
       address: sanitizeText(address, 255),
-      whatsapp: sanitizeText(whatsapp, 20),
-      emergency_contact: sanitizeText(emergency_contact, 20),
+      whatsapp: sanitizeText(whatsapp, 11),
+      emergency_contact: sanitizeText(emergency_contact, 11),
       preferred_area: sanitizeText(preferred_area, 120),
       preferred_time: normalizedPreferredTime,
       can_travel: toBoolean(can_travel),
@@ -591,20 +601,20 @@ const submitPostHealthCheck = async (req, res) => {
       dizziness ||
       infection;
 
-await pool.query(
-  `UPDATE users
+    await pool.query(
+      `UPDATE users
    SET post_donation_pending = 0
    WHERE id = ?`,
-  [userId]
-);
+      [userId]
+    );
 
-return res.status(200).json({
-  success: true,
-  pendingCleared: true,
-  message: hasIssue
-    ? "Recovery issues recorded."
-    : "Post donation health check submitted successfully."
-});
+    return res.status(200).json({
+      success: true,
+      pendingCleared: true,
+      message: hasIssue
+        ? "Recovery issues recorded."
+        : "Post donation health check submitted successfully."
+    });
 
   } catch (error) {
     console.error(error);
